@@ -1,10 +1,11 @@
-package com.konrad.iotmonitoring;
+package com.konrad.iotmonitoring2;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 public record IotDeviceData(
         String deviceId,
-        Instant timestamp,
+        long timestamp,
         double temperature,
         double pressure
 ) {
