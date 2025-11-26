@@ -1,7 +1,4 @@
-package com.konrad.iotmonitoring2;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
+package com.konrad.iotmonitoring2.models;
 
 public record IotDeviceData(
         String deviceId,

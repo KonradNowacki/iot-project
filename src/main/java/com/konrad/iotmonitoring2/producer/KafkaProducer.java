@@ -1,6 +1,6 @@
 package com.konrad.iotmonitoring2.producer;
 
-import com.konrad.iotmonitoring2.IotDeviceData;
+import com.konrad.iotmonitoring2.models.IotDeviceData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -17,6 +17,5 @@ public class KafkaProducer {
 
     public void send(IotDeviceData event) {
         kafkaTemplate.send(COLLECT_TOPIC, event.deviceId(), event);
-        System.out.println("Sent event: " + event);
     }
 }

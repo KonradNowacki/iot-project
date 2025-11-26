@@ -1,7 +1,6 @@
 package com.konrad.iotmonitoring2.consumer;
 
-import com.konrad.iotmonitoring2.IotDeviceData;
-import com.konrad.iotmonitoring2.config.KafkaTopicConfig;
+import com.konrad.iotmonitoring2.models.IotDeviceData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,7 @@ public class KafkaConsumer {
 
     @KafkaListener(topics = COLLECT_TOPIC, groupId = "qwe")
     public void listenCollect(IotDeviceData event) {
-        log.info("✅ Collect topic event: {}", event);
+        log.info("✅ Collect topic event: {}", event.deviceId());
     }
 
     @KafkaListener(topics = STATISTICS_TOPIC, groupId = "statistics-group")
