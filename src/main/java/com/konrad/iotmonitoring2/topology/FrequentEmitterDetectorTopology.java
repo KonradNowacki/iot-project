@@ -24,39 +24,64 @@ public class FrequentEmitterDetectorTopology {
     public KStream<String, IotDeviceData> iotStream(StreamsBuilder builder) {
 
 
-        // JSON serde for your IotDeviceData record
+
         JsonSerde<IotDeviceData> iotSerde = new JsonSerde<>(IotDeviceData.class);
 
-        // 1. Consume the source stream
+        // 1️⃣ Consume the source stream
         KStream<String, IotDeviceData> source =
-                builder.stream(
-                        COLLECT_TOPIC,
-                        Consumed.with(Serdes.String(), iotSerde)
-                );
+                builder.stream(COLLECT_TOPIC, Consumed.with(Serdes.String(), iotSerde));
 
-
-        source.foreach((key, value) -> System.out.println("👉👉👉" + key + ": " + value));
-
-
-        // 2. Group by deviceId
+        // 2️⃣ Group by deviceId
         KGroupedStream<String, IotDeviceData> grouped =
                 source.groupBy((key, value) -> value.deviceId(),
                         Grouped.with(Serdes.String(), iotSerde));
 
-        KTable<String, Long> counts = grouped.count();
+        // 3️⃣ Apply 10-second tumbling window
+        TimeWindowedKStream<String, IotDeviceData> windowed =
+                grouped.windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofSeconds(10)));
 
+        KTable<Windowed<String>, WindowedEvent> aggregated = windowed.aggregate(
+                // Initializer: create a new WindowedEvent
+                WindowedEvent::new,
 
-        counts.toStream().foreach((deviceId, count) ->
-                System.out.println("Device: " + deviceId + ", Count: " + count));
+                // Aggregator: update lastEvent + count
+                (key, newValue, agg) -> {
+                    agg.lastEvent = newValue;
+                    agg.count += 1;
+                    return agg;
+                },
+                Materialized.with(Serdes.String(), new JsonSerde<>(WindowedEvent.class))
+        );
 
+        // 5️⃣ Convert to stream
+        KStream<Windowed<String>, WindowedEvent> aggregatedStream = aggregated.toStream();
 
-//        // 3. Apply 10-second tumbling window and count events
-//        TimeWindowedKStream<String, IotDeviceData> windowed =
-//                grouped.windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofSeconds(10)));
-//
+        // 6️⃣ Branch based on count
+        KStream<Windowed<String>, WindowedEvent>[] branches = aggregatedStream.branch(
+                (windowedKey, windowedEvent) -> windowedEvent.count > 1, // ALERT
+                (windowedKey, windowedEvent) -> true                     // STATISTICS
+        );
 
+        // 7️⃣ Send last event to ALERT_TOPIC
+        branches[0]
+                .map((windowedKey, windowedEvent) -> KeyValue.pair(windowedKey.key(), windowedEvent.lastEvent))
+                .to(ALERT_TOPIC, Produced.with(Serdes.String(), iotSerde));
+
+        // 8️⃣ Send last event to STATISTICS_TOPIC
+        branches[1]
+                .map((windowedKey, windowedEvent) -> KeyValue.pair(windowedKey.key(), windowedEvent.lastEvent))
+                .to(STATISTICS_TOPIC, Produced.with(Serdes.String(), iotSerde));
+
+        //Ļ Optional: print for debugging
+        aggregatedStream.foreach((windowedKey, event) -> {
+            System.out.println("Device: " + windowedKey.key() +
+                    ", Window: [" + windowedKey.window().start() + " - " + windowedKey.window().end() + "]" +
+                    ", LastEvent: " + event.lastEvent +
+                    ", Count: " + event.count);
+        });
 
         return source;
+
 
     }
 
